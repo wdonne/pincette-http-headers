@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <groupId>net.pincette</groupId>
+  <artifactId>pincette-http-headers-test</artifactId>
+  <version>1.0.0</version>
+  <packaging>jar</packaging>
+  <name>pincette-http-headers-test</name>
+  <description>A test plugin</description>
+  <url>https://github.com/wdonne/pincette-http-headers</url>
+
+  <organization>
+    <name>Pincette</name>
+    <url>https://pincette.net</url>
+  </organization>
+
+  <scm>
+    <url>https://github.com/json-event-sourcing/pincette-http-headers</url>
+    <connection>scm:git@github.com:wdonne/pincette-http-headers.git</connection>
+    <developerConnection>scm:git@github.com:wdonne/pincette-http-headers.git
+    </developerConnection>
+  </scm>
+
+  <developers>
+    <developer>
+      <id>wdonne</id>
+      <name>Werner Donné</name>
+      <email>werner.donne@pincette.net</email>
+      <url>https://pincette.net</url>
+      <organization>Pincette</organization>
+      <organizationUrl>https://pincette.net</organizationUrl>
+    </developer>
+  </developers>
+
+  <licenses>
+    <license>
+      <name>BSD-style</name>
+      <url>http://www.opensource.org/licenses/bsd-license.php</url>
+      <distribution>repo</distribution>
+    </license>
+  </licenses>
+
+  <properties>
+    <maven.compiler.target>17</maven.compiler.target>
+    <maven.compiler.source>17</maven.compiler.source>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+  </properties>
+
+  <dependencies>
+    <dependency>
+      <groupId>net.pincette</groupId>
+      <artifactId>pincette-http-headers-plugin</artifactId>
+      <version>1.0.0</version>
+    </dependency>
+    <dependency>
+      <groupId>net.pincette</groupId>
+      <artifactId>pincette-common</artifactId>
+      <version>2.4.0</version>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-jar-plugin</artifactId>
+        <version>3.3.0</version>
+        <configuration>
+          <outputDirectory>${project.build.directory}/plugin/modules</outputDirectory>
+        </configuration>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-dependency-plugin</artifactId>
+        <version>3.6.1</version>
+        <executions>
+          <execution>
+            <id>copy-dependencies-modules</id>
+            <phase>package</phase>
+            <goals>
+              <goal>copy-dependencies</goal>
+            </goals>
+            <configuration>
+              <outputDirectory>${project.build.directory}/plugin/modules</outputDirectory>
+              <overWriteReleases>false</overWriteReleases>
+              <overWriteSnapshots>false</overWriteSnapshots>
+              <overWriteIfNewer>true</overWriteIfNewer>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
+  </build>
+</project>
