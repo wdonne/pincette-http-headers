@@ -4,5 +4,6 @@ module net.pincette.http.headers.test {
   requires net.pincette.common;
 
   provides net.pincette.http.headers.plugin.Plugin with
-      net.pincette.http.headers.test.HeadersPlugin;
+      net.pincette.http.headers.test.HeadersPlugin,
+      net.pincette.http.headers.test.ImHerePlugin;
 }

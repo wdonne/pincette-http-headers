@@ -5,7 +5,7 @@ import static java.net.http.HttpRequest.BodyPublishers.fromPublisher;
 import static java.net.http.HttpResponse.BodyHandlers.ofPublisher;
 import static java.util.Optional.ofNullable;
 import static java.util.concurrent.CompletableFuture.completedFuture;
-import static java.util.logging.Level.INFO;
+import static java.util.logging.Level.FINEST;
 import static java.util.logging.Level.WARNING;
 import static java.util.logging.Logger.getLogger;
 import static net.pincette.rs.Chain.with;
@@ -39,6 +39,7 @@ import java.util.Set;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Flow.Publisher;
 import java.util.function.Function;
+import java.util.function.Supplier;
 import java.util.logging.Logger;
 import java.util.stream.Stream;
 import net.pincette.http.headers.plugin.Plugin;
@@ -60,7 +61,7 @@ public class Server {
   private final HttpServer httpServer;
 
   public Server(final int port, final Config config) {
-    httpServer = new HttpServer(port, handler(config, getClient()));
+    httpServer = new HttpServer(port, trace(handler(config, getClient())));
   }
 
   private static java.net.http.HttpHeaders convertHeaders(
@@ -101,7 +102,7 @@ public class Server {
                 createRequest(resolve(uri, request.uri()), request, requestBody), ofPublisher())
             .thenApply(
                 resp -> {
-                  resp.headers().map().forEach(response.headers()::set);
+                  setResponse(response, resp.headers(), resp.statusCode());
 
                   return resp;
                 })
@@ -112,6 +113,8 @@ public class Server {
 
   private static RequestHandler handler(final Config config, final HttpClient client) {
     final List<Plugin> plugins = plugins(config).toList();
+
+    plugins.forEach(p -> LOGGER.info(() -> "Loaded plugin " + p));
 
     if (plugins.isEmpty()) {
       LOGGER.log(WARNING, "No plugins are loaded.");
@@ -159,17 +162,7 @@ public class Server {
   private static Stream<Plugin> plugins(final Config config) {
     return tryToGetSilent(() -> config.getString(PLUGINS))
         .map(Paths::get)
-        .map(
-            directory ->
-                loadPlugins(
-                    directory,
-                    layer -> {
-                      var l = ServiceLoader.load(layer, Plugin.class);
-
-                      LOGGER.log(INFO, () -> "Loaded " + l);
-
-                      return l;
-                    }))
+        .map(directory -> loadPlugins(directory, layer -> ServiceLoader.load(layer, Plugin.class)))
         .orElseGet(Stream::empty);
   }
 
@@ -237,6 +230,24 @@ public class Server {
     }
 
     return response;
+  }
+
+  private static <T> T trace(final T v, final Supplier<String> message) {
+    LOGGER.log(FINEST, message);
+
+    return v;
+  }
+
+  private static RequestHandler trace(final RequestHandler handler) {
+    return (request, requestBody, response) ->
+        handler
+            .apply(trace(request, () -> "request: " + request), requestBody, response)
+            .thenApply(
+                resp -> {
+                  trace(response, () -> "response: " + response);
+
+                  return resp;
+                });
   }
 
   public void close() {

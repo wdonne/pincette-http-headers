@@ -19,7 +19,6 @@ public class HeadersPlugin implements Plugin {
   private static final String RESULT_HEADER = "X-Result";
   private static final String TEST_HEADER = "X-TestCase";
 
-  @Override
   public CompletionStage<RequestResult> request(final HttpHeaders headers) {
     return switch (headers.map().get(TEST_HEADER).get(0)) {
       case "test1" ->
@@ -48,7 +47,6 @@ public class HeadersPlugin implements Plugin {
     };
   }
 
-  @Override
   public CompletionStage<HttpHeaders> response(final HttpHeaders headers) {
     return completedFuture(of(merge(headers.map(), map(pair(RESULT_HEADER, list("value")))), ALL));
   }

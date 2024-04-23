@@ -1,13 +1,14 @@
 package net.pincette.http.headers;
 
 import static com.typesafe.config.ConfigValueFactory.fromAnyRef;
+import static io.netty.buffer.Unpooled.copiedBuffer;
 import static io.netty.handler.codec.http.HttpResponseStatus.OK;
 import static java.net.http.HttpClient.newBuilder;
 import static java.net.http.HttpHeaders.of;
 import static java.net.http.HttpRequest.BodyPublishers.noBody;
-import static java.net.http.HttpResponse.BodyHandlers.discarding;
+import static java.net.http.HttpResponse.BodyHandlers.ofString;
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static net.pincette.netty.http.Util.simpleResponse;
-import static net.pincette.rs.Util.empty;
 import static net.pincette.util.Collections.list;
 import static net.pincette.util.Collections.map;
 import static net.pincette.util.Pair.pair;
@@ -26,6 +27,7 @@ import java.net.http.HttpHeaders;
 import java.util.function.BiPredicate;
 import net.pincette.netty.http.HttpServer;
 import net.pincette.netty.http.RequestHandler;
+import net.pincette.rs.Source;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
@@ -33,12 +35,21 @@ import org.junit.jupiter.api.Test;
 
 class TestHeaders {
   private static final BiPredicate<String, String> ALL = (k, v) -> true;
+  private static final String CONTENT_TYPE_HEADER = "Content-Type";
   private static final String PATH_HEADER = "X-Path";
   private static final String RESULT_HEADER = "X-Result";
+  private static final String RESULT_HEADER_2 = "X-Result2";
   private static final String TEST_HEADER = "X-TestCase";
   private static final HttpClient client = getClient();
   private static final Server headers = new Server(9001, createConfig());
   private static final HttpServer server = new HttpServer(9000, requestHandler());
+
+  private static HttpResponse addContentTypeHeader(
+      final HttpResponse response, final String mimeType) {
+    response.headers().set(CONTENT_TYPE_HEADER, mimeType);
+
+    return response;
+  }
 
   private static HttpResponse addPathHeader(final HttpResponse response, final String path) {
     response.headers().set(PATH_HEADER, path);
@@ -77,7 +88,7 @@ class TestHeaders {
     return newBuilder().version(Version.HTTP_1_1).followRedirects(Redirect.NORMAL).build();
   }
 
-  private static java.net.http.HttpResponse<?> request(
+  private static java.net.http.HttpResponse<String> request(
       final HttpHeaders headers, final String path) {
     return tryToGetRethrow(
             () ->
@@ -85,17 +96,21 @@ class TestHeaders {
                     setHeaders(
                             java.net.http.HttpRequest.newBuilder()
                                 .uri(new URI("http://localhost:9001" + path))
-                                .method("HEAD", noBody()),
+                                .method("GET", noBody()),
                             headers)
                         .build(),
-                    discarding()))
+                    ofString(UTF_8)))
         .orElse(null);
   }
 
   private static RequestHandler requestHandler() {
     return (request, requestBody, response) ->
         simpleResponse(
-            copyTestHeaders(request, addPathHeader(response, request.uri())), OK, empty());
+            copyTestHeaders(
+                request,
+                addContentTypeHeader(addPathHeader(response, request.uri()), "text/plain")),
+            OK,
+            Source.of(copiedBuffer("test", UTF_8)));
   }
 
   private static java.net.http.HttpRequest.Builder setHeaders(
@@ -111,19 +126,20 @@ class TestHeaders {
     list("/", "/path")
         .forEach(
             p -> {
-              final HttpHeaders headers =
-                  request(of(map(pair(TEST_HEADER, list("test1"))), ALL), p).headers();
+              final java.net.http.HttpResponse<String> response =
+                  request(of(map(pair(TEST_HEADER, list("test1"))), ALL), p);
 
-              System.out.println(headers);
-              assertEquals("value1", headers.map().get("test1").get(0));
-              assertEquals(p, headers.map().get(PATH_HEADER).get(0));
+              assertEquals("value1", response.headers().map().get("test1").get(0));
+              assertEquals(p, response.headers().map().get(PATH_HEADER).get(0));
+              assertEquals("value", response.headers().map().get(RESULT_HEADER_2).get(0));
+              assertEquals("test", response.body());
             });
   }
 
   @Test
   @DisplayName("test2")
   void test2() {
-    final java.net.http.HttpResponse<?> response =
+    final java.net.http.HttpResponse<String> response =
         request(of(map(pair(TEST_HEADER, list("test2"))), ALL), "/");
 
     assertEquals("bad", response.headers().map().get(RESULT_HEADER).get(0));
@@ -136,17 +152,16 @@ class TestHeaders {
     list("/", "/path")
         .forEach(
             p -> {
-              final HttpHeaders headers =
+              final java.net.http.HttpResponse<String> response =
                   request(
-                          of(
-                              map(pair(TEST_HEADER, list("test3")), pair("test3", list("value3"))),
-                              ALL),
-                          p)
-                      .headers();
+                      of(map(pair(TEST_HEADER, list("test3")), pair("test3", list("value3"))), ALL),
+                      p);
 
-              assertEquals("value3", headers.map().get("test3").get(0));
-              assertEquals("value3", headers.map().get(RESULT_HEADER).get(0));
-              assertEquals(p, headers.map().get(PATH_HEADER).get(0));
+              assertEquals("value3", response.headers().map().get("test3").get(0));
+              assertEquals("value3", response.headers().map().get(RESULT_HEADER).get(0));
+              assertEquals("value", response.headers().map().get(RESULT_HEADER_2).get(0));
+              assertEquals(p, response.headers().map().get(PATH_HEADER).get(0));
+              assertEquals("test", response.body());
             });
   }
 }
