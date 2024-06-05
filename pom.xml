@@ -6,7 +6,7 @@
 
   <groupId>net.pincette</groupId>
   <artifactId>pincette-http-headers</artifactId>
-  <version>1.0.1</version>
+  <version>1.0.2</version>
   <packaging>jar</packaging>
   <name>pincette-http-headers</name>
   <description>Allows request and response headers to be manipulated</description>
@@ -63,17 +63,17 @@
     <dependency>
       <groupId>net.pincette</groupId>
       <artifactId>pincette-rs</artifactId>
-      <version>3.5.2</version>
+      <version>3.6.0</version>
     </dependency>
     <dependency>
       <groupId>net.pincette</groupId>
       <artifactId>pincette-netty-http</artifactId>
-      <version>3.1.6</version>
+      <version>3.2.0</version>
     </dependency>
     <dependency>
       <groupId>com.typesafe</groupId>
       <artifactId>config</artifactId>
-      <version>1.4.2</version>
+      <version>1.4.3</version>
     </dependency>
     <dependency>
       <groupId>org.glassfish</groupId>
@@ -104,7 +104,7 @@
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-jar-plugin</artifactId>
-        <version>3.4.0</version>
+        <version>3.4.1</version>
         <configuration>
           <outputDirectory>${project.build.directory}/modules</outputDirectory>
           <archive>
@@ -117,7 +117,7 @@
       <plugin>
         <groupId>com.google.cloud.tools</groupId>
         <artifactId>jib-maven-plugin</artifactId>
-        <version>3.4.2</version>
+        <version>3.4.3</version>
         <configuration>
           <from>
             <image>gcr.io/distroless/java17-debian12</image>

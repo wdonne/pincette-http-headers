@@ -1,18 +1,14 @@
 package net.pincette.http.headers;
 
 import static java.net.http.HttpClient.newBuilder;
-import static java.net.http.HttpRequest.BodyPublishers.fromPublisher;
-import static java.net.http.HttpResponse.BodyHandlers.ofPublisher;
 import static java.util.Optional.ofNullable;
 import static java.util.concurrent.CompletableFuture.completedFuture;
-import static java.util.logging.Level.FINEST;
 import static java.util.logging.Level.WARNING;
 import static java.util.logging.Logger.getLogger;
-import static net.pincette.rs.Chain.with;
+import static net.pincette.netty.http.Util.wrapTracing;
 import static net.pincette.rs.Util.empty;
 import static net.pincette.util.Collections.map;
 import static net.pincette.util.Collections.reverse;
-import static net.pincette.util.Collections.set;
 import static net.pincette.util.Or.tryWith;
 import static net.pincette.util.Pair.pair;
 import static net.pincette.util.Plugins.loadPlugins;
@@ -22,7 +18,6 @@ import static net.pincette.util.Util.tryToGetSilent;
 
 import com.typesafe.config.Config;
 import io.netty.buffer.ByteBuf;
-import io.netty.buffer.Unpooled;
 import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpResponse;
@@ -35,25 +30,21 @@ import java.nio.file.Paths;
 import java.util.List;
 import java.util.Optional;
 import java.util.ServiceLoader;
-import java.util.Set;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Flow.Publisher;
 import java.util.function.Function;
-import java.util.function.Supplier;
 import java.util.logging.Logger;
 import java.util.stream.Stream;
 import net.pincette.http.headers.plugin.Plugin;
 import net.pincette.http.headers.plugin.RequestResult;
+import net.pincette.netty.http.Forwarder;
 import net.pincette.netty.http.HttpServer;
 import net.pincette.netty.http.RequestHandler;
-import net.pincette.rs.FlattenList;
 
 /**
  * @author Werner Donné
  */
 public class Server {
-  private static final Set<String> DISALLOWED_HEADERS =
-      set("connection", "content-length", "expect", "host", "upgrade");
   private static final String FORWARD_TO = "forwardTo";
   private static final Logger LOGGER = getLogger("net.pincette.http.headers");
   private static final String PLUGINS = "plugins";
@@ -61,23 +52,13 @@ public class Server {
   private final HttpServer httpServer;
 
   public Server(final int port, final Config config) {
-    httpServer = new HttpServer(port, trace(handler(config, getClient())));
+    httpServer = new HttpServer(port, wrapTracing(handler(config, getClient()), LOGGER));
   }
 
   private static java.net.http.HttpHeaders convertHeaders(
       final io.netty.handler.codec.http.HttpHeaders headers) {
     return java.net.http.HttpHeaders.of(
         map(headers.names().stream().map(n -> pair(n, headers.getAll(n)))), (k, v) -> true);
-  }
-
-  private static java.net.http.HttpRequest createRequest(
-      final URI uri, final HttpRequest request, final Publisher<ByteBuf> requestBody) {
-    return java.net.http.HttpRequest.newBuilder()
-        .uri(uri)
-        .method(
-            request.method().name(), fromPublisher(with(requestBody).map(ByteBuf::nioBuffer).get()))
-        .headers(headers(request.headers()))
-        .build();
   }
 
   private static RequestHandler devNull() {
@@ -91,24 +72,8 @@ public class Server {
   private static RequestHandler forwarder(final Config config, final HttpClient client) {
     return tryToGetSilent(() -> config.getString(FORWARD_TO))
         .flatMap(uri -> tryToGetRethrow(() -> new URI(uri)))
-        .map(uri -> forwarder(uri, client))
+        .map(uri -> Forwarder.forwarder(uri, client))
         .orElseGet(Server::devNull);
-  }
-
-  private static RequestHandler forwarder(final URI uri, final HttpClient client) {
-    return (request, requestBody, response) ->
-        client
-            .sendAsync(
-                createRequest(resolve(uri, request.uri()), request, requestBody), ofPublisher())
-            .thenApply(
-                resp -> {
-                  setResponse(response, resp.headers(), resp.statusCode());
-
-                  return resp;
-                })
-            .thenApply(
-                resp ->
-                    with(resp.body()).map(new FlattenList<>()).map(Unpooled::wrappedBuffer).get());
   }
 
   private static RequestHandler handler(final Config config, final HttpClient client) {
@@ -152,13 +117,6 @@ public class Server {
     return convertHeaders(request.headers());
   }
 
-  private static String[] headers(final HttpHeaders headers) {
-    return headers.entries().stream()
-        .filter(e -> !DISALLOWED_HEADERS.contains(e.getKey().toLowerCase()))
-        .flatMap(e -> Stream.of(e.getKey(), e.getValue()))
-        .toArray(String[]::new);
-  }
-
   private static Stream<Plugin> plugins(final Config config) {
     return tryToGetSilent(() -> config.getString(PLUGINS))
         .map(Paths::get)
@@ -176,23 +134,6 @@ public class Server {
         .thenComposeAsync(
             h -> responseWrapper != null ? responseWrapper.apply(h) : completedFuture(h))
         .thenApply(h -> setHeaders(target, h));
-  }
-
-  private static URI resolve(final URI configured, final String given) {
-    return tryToGetRethrow(() -> new URI(given))
-        .flatMap(
-            g ->
-                tryToGetRethrow(
-                    () ->
-                        new URI(
-                            configured.getScheme(),
-                            configured.getUserInfo(),
-                            configured.getHost(),
-                            configured.getPort(),
-                            g.getPath(),
-                            g.getQuery(),
-                            g.getFragment())))
-        .orElse(null);
   }
 
   private static Optional<CompletionStage<Publisher<ByteBuf>>> returnImmediately(
@@ -230,24 +171,6 @@ public class Server {
     }
 
     return response;
-  }
-
-  private static <T> T trace(final T v, final Supplier<String> message) {
-    LOGGER.log(FINEST, message);
-
-    return v;
-  }
-
-  private static RequestHandler trace(final RequestHandler handler) {
-    return (request, requestBody, response) ->
-        handler
-            .apply(trace(request, () -> "request: " + request), requestBody, response)
-            .thenApply(
-                resp -> {
-                  trace(response, () -> "response: " + response);
-
-                  return resp;
-                });
   }
 
   public void close() {
