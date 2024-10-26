@@ -8,7 +8,7 @@ The configuration is managed by the [Lightbend Config package](https://github.co
 
 |Entry|Mandatory|Description|
 |---|---|---|
-|forwardTo|Yes|The URL to which all requests are forwarded with the same path, query and fragment.|
+|forwardTo|No|The URL to which all requests are forwarded with the same path, query and fragment. If the field is not provided and there is not forwarding plugin, then the status code 501 is returned.|
 |plugins|Yes|The folder in which the plugins are placed. Each subfolder will be loaded as a Java 9 module in its own module layer.|
 
 The configuration is also available to the plugins because they can load it from the same place. Of course, they could load whatever they want.

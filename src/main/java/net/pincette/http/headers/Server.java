@@ -1,10 +1,11 @@
 package net.pincette.http.headers;
 
+import static io.netty.handler.codec.http.HttpResponseStatus.NOT_IMPLEMENTED;
 import static java.net.http.HttpClient.newBuilder;
 import static java.util.Optional.ofNullable;
 import static java.util.concurrent.CompletableFuture.completedFuture;
 import static java.util.logging.Level.WARNING;
-import static java.util.logging.Logger.getLogger;
+import static net.pincette.http.headers.Application.LOGGER;
 import static net.pincette.netty.http.Util.wrapTracing;
 import static net.pincette.rs.Util.empty;
 import static net.pincette.util.Collections.map;
@@ -33,7 +34,6 @@ import java.util.ServiceLoader;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Flow.Publisher;
 import java.util.function.Function;
-import java.util.logging.Logger;
 import java.util.stream.Stream;
 import net.pincette.http.headers.plugin.Plugin;
 import net.pincette.http.headers.plugin.RequestResult;
@@ -46,7 +46,6 @@ import net.pincette.netty.http.RequestHandler;
  */
 public class Server {
   private static final String FORWARD_TO = "forwardTo";
-  private static final Logger LOGGER = getLogger("net.pincette.http.headers");
   private static final String PLUGINS = "plugins";
 
   private final HttpServer httpServer;
@@ -62,7 +61,11 @@ public class Server {
   }
 
   private static RequestHandler devNull() {
-    return (request, requestBody, response) -> completedFuture(empty());
+    return (request, requestBody, response) -> {
+      response.setStatus(NOT_IMPLEMENTED);
+
+      return completedFuture(empty());
+    };
   }
 
   private static HttpClient getClient() {
