@@ -6,7 +6,7 @@
 
   <groupId>net.pincette</groupId>
   <artifactId>pincette-http-headers</artifactId>
-  <version>1.0.4</version>
+  <version>1.1.0</version>
   <packaging>jar</packaging>
   <name>pincette-http-headers</name>
   <description>Allows request and response headers to be manipulated</description>
@@ -53,22 +53,27 @@
     <dependency>
       <groupId>net.pincette</groupId>
       <artifactId>pincette-http-headers-plugin</artifactId>
-      <version>1.0.0</version>
+      <version>1.1.0</version>
     </dependency>
     <dependency>
       <groupId>net.pincette</groupId>
       <artifactId>pincette-common</artifactId>
-      <version>2.4.2</version>
+      <version>2.5.0</version>
     </dependency>
     <dependency>
       <groupId>net.pincette</groupId>
       <artifactId>pincette-rs</artifactId>
-      <version>3.6.2</version>
+      <version>3.7.0</version>
     </dependency>
     <dependency>
       <groupId>net.pincette</groupId>
       <artifactId>pincette-netty-http</artifactId>
-      <version>3.2.1</version>
+      <version>3.2.3</version>
+    </dependency>
+    <dependency>
+      <groupId>net.pincette</groupId>
+      <artifactId>pincette-config-util</artifactId>
+      <version>1.0.0</version>
     </dependency>
     <dependency>
       <groupId>com.typesafe</groupId>

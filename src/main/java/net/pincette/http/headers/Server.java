@@ -1,10 +1,13 @@
 package net.pincette.http.headers;
 
+import static io.netty.handler.codec.http.HttpResponseStatus.NOT_FOUND;
 import static io.netty.handler.codec.http.HttpResponseStatus.NOT_IMPLEMENTED;
 import static java.net.http.HttpClient.newBuilder;
 import static java.util.Optional.ofNullable;
 import static java.util.concurrent.CompletableFuture.completedFuture;
+import static java.util.logging.Level.FINEST;
 import static java.util.logging.Level.WARNING;
+import static net.pincette.config.Util.configValue;
 import static net.pincette.http.headers.Application.LOGGER;
 import static net.pincette.netty.http.Util.wrapTracing;
 import static net.pincette.rs.Util.empty;
@@ -15,7 +18,6 @@ import static net.pincette.util.Pair.pair;
 import static net.pincette.util.Plugins.loadPlugins;
 import static net.pincette.util.StreamUtil.stream;
 import static net.pincette.util.Util.tryToGetRethrow;
-import static net.pincette.util.Util.tryToGetSilent;
 
 import com.typesafe.config.Config;
 import io.netty.buffer.ByteBuf;
@@ -34,24 +36,33 @@ import java.util.ServiceLoader;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Flow.Publisher;
 import java.util.function.Function;
+import java.util.function.Supplier;
 import java.util.stream.Stream;
 import net.pincette.http.headers.plugin.Plugin;
 import net.pincette.http.headers.plugin.RequestResult;
 import net.pincette.netty.http.Forwarder;
 import net.pincette.netty.http.HttpServer;
 import net.pincette.netty.http.RequestHandler;
+import net.pincette.util.Cases;
+import net.pincette.util.Pair;
 
 /**
  * @author Werner Donné
  */
 public class Server {
+  private static final String END_POINT = "endPoint";
   private static final String FORWARD_TO = "forwardTo";
+  private static final String PATH_PREFIX = "pathPrefix";
   private static final String PLUGINS = "plugins";
+  private static final String ROUTES = "routes";
 
   private final HttpServer httpServer;
 
   public Server(final int port, final Config config) {
-    httpServer = new HttpServer(port, wrapTracing(handler(config, getClient()), LOGGER));
+    httpServer =
+        new HttpServer(
+            port,
+            wrapTracing(handler(trace(config, () -> "Config: " + config), getClient()), LOGGER));
   }
 
   private static java.net.http.HttpHeaders convertHeaders(
@@ -72,10 +83,18 @@ public class Server {
     return newBuilder().version(Version.HTTP_1_1).followRedirects(Redirect.NORMAL).build();
   }
 
+  private static Optional<RequestHandler> getForwarder(
+      final List<Pair<String, RequestHandler>> forwarders, final String path) {
+    return forwarders.stream().filter(f -> path.startsWith(f.first)).findFirst().map(f -> f.second);
+  }
+
   private static RequestHandler forwarder(final Config config, final HttpClient client) {
-    return tryToGetSilent(() -> config.getString(FORWARD_TO))
-        .flatMap(uri -> tryToGetRethrow(() -> new URI(uri)))
-        .map(uri -> Forwarder.forwarder(uri, client))
+    return Cases.<Config, RequestHandler>withValue(config)
+        .orGet(
+            c -> configValue(c::getString, FORWARD_TO),
+            uri -> singleRoute(uri, client).orElse(null))
+        .orGet(c -> configValue(c::getConfigList, ROUTES), routes -> router(routes(routes), client))
+        .get()
         .orElseGet(Server::devNull);
   }
 
@@ -121,7 +140,7 @@ public class Server {
   }
 
   private static Stream<Plugin> plugins(final Config config) {
-    return tryToGetSilent(() -> config.getString(PLUGINS))
+    return configValue(config::getString, PLUGINS)
         .map(Paths::get)
         .map(directory -> loadPlugins(directory, layer -> ServiceLoader.load(layer, Plugin.class)))
         .orElseGet(Stream::empty);
@@ -144,6 +163,48 @@ public class Server {
     return ofNullable(result.response)
         .map(res -> setResponse(response, res.headers, res.statusCode))
         .map(h -> completedFuture(empty()));
+  }
+
+  private static RequestHandler router(
+      final Stream<Pair<String, URI>> routes, final HttpClient client) {
+    final List<Pair<String, RequestHandler>> forwarders = routes(routes, client);
+
+    return (request, requestBody, response) ->
+        tryToGetRethrow(() -> new URI(request.uri()))
+            .map(URI::getPath)
+            .flatMap(path -> getForwarder(forwarders, path))
+            .map(f -> f.apply(request, requestBody, response))
+            .orElseGet(
+                () -> {
+                  response.setStatus(NOT_FOUND);
+                  return completedFuture(empty());
+                });
+  }
+
+  private static List<Pair<String, RequestHandler>> routes(
+      final Stream<Pair<String, URI>> routes, final HttpClient client) {
+    return routes
+        .map(
+            pair ->
+                pair(
+                    trace(pair.first, () -> PATH_PREFIX + ": " + pair.first),
+                    Forwarder.forwarder(
+                        trace(pair.second, () -> END_POINT + ": " + pair.second), client)))
+        .toList();
+  }
+
+  private static Stream<Pair<String, URI>> routes(final List<? extends Config> routes) {
+    return routes.stream()
+        .map(Config.class::cast)
+        .flatMap(
+            v ->
+                configValue(v::getString, PATH_PREFIX)
+                    .flatMap(
+                        p ->
+                            configValue(v::getString, END_POINT)
+                                .flatMap(e -> tryToGetRethrow(() -> new URI(e)))
+                                .map(u -> pair(p, u)))
+                    .stream());
   }
 
   private static HttpRequest setHeaders(
@@ -174,6 +235,19 @@ public class Server {
     }
 
     return response;
+  }
+
+  private static Optional<RequestHandler> singleRoute(final String uri, final HttpClient client) {
+    return tryToGetRethrow(() -> new URI(uri))
+        .map(u -> pair("/", u))
+        .map(Stream::of)
+        .map(r -> router(r, client));
+  }
+
+  private static <T> T trace(final T v, final Supplier<String> message) {
+    LOGGER.log(FINEST, message);
+
+    return v;
   }
 
   public void close() {

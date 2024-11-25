@@ -9,6 +9,7 @@ module application {
   requires net.pincette.netty.http;
   requires java.logging;
   requires jdk.unsupported; // For the MongoDB driver.
+  requires net.pincette.config;
 
   uses net.pincette.http.headers.plugin.Plugin;
 

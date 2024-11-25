@@ -15,7 +15,7 @@ import java.util.logging.Logger;
  */
 public class Application {
   static final Logger LOGGER = getLogger("net.pincette.http.headers");
-  private static final String VERSION = "1.0.4";
+  private static final String VERSION = "1.1.0";
 
   @SuppressWarnings("java:S106") // Not logging. Its just a CLI.
   public static void main(final String[] args) {

@@ -12,7 +12,6 @@ import java.util.concurrent.CompletionStage;
 import java.util.function.BiPredicate;
 import net.pincette.http.headers.plugin.Plugin;
 import net.pincette.http.headers.plugin.RequestResult;
-import net.pincette.http.headers.plugin.Response;
 
 public class ImHerePlugin implements Plugin {
   private static final BiPredicate<String, String> ALL = (k, v) -> true;

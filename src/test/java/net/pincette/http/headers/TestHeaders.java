@@ -1,6 +1,7 @@
 package net.pincette.http.headers;
 
 import static com.typesafe.config.ConfigValueFactory.fromAnyRef;
+import static com.typesafe.config.ConfigValueFactory.fromIterable;
 import static io.netty.buffer.Unpooled.copiedBuffer;
 import static io.netty.handler.codec.http.HttpResponseStatus.OK;
 import static java.net.http.HttpClient.newBuilder;
@@ -39,10 +40,13 @@ class TestHeaders {
   private static final String PATH_HEADER = "X-Path";
   private static final String RESULT_HEADER = "X-Result";
   private static final String RESULT_HEADER_2 = "X-Result2";
+  private static final String SERVER_HEADER = "X-Server";
   private static final String TEST_HEADER = "X-TestCase";
   private static final HttpClient client = getClient();
-  private static final Server headers = new Server(9001, createConfig());
-  private static final HttpServer server = new HttpServer(9000, requestHandler());
+  private static final Server headers1 = new Server(9000, createConfigForward());
+  private static final Server headers2 = new Server(9001, createConfigRoutes());
+  private static final HttpServer server1 = new HttpServer(9002, requestHandler("server1"));
+  private static final HttpServer server2 = new HttpServer(9003, requestHandler("server2"));
 
   private static HttpResponse addContentTypeHeader(
       final HttpResponse response, final String mimeType) {
@@ -51,22 +55,35 @@ class TestHeaders {
     return response;
   }
 
-  private static HttpResponse addPathHeader(final HttpResponse response, final String path) {
-    response.headers().set(PATH_HEADER, path);
+  private static HttpResponse addHeader(
+      final HttpResponse response, final String name, final String value) {
+    response.headers().set(name, value);
 
     return response;
   }
 
+  private static HttpResponse addPathHeader(final HttpResponse response, final String path) {
+    return addHeader(response, PATH_HEADER, path);
+  }
+
+  private static HttpResponse addServerHeader(final HttpResponse response, final String name) {
+    return addHeader(response, SERVER_HEADER, name);
+  }
+
   @AfterAll
   static void after() {
-    headers.close();
-    server.close();
+    headers1.close();
+    headers2.close();
+    server1.close();
+    server2.close();
   }
 
   @BeforeAll
   static void before() {
-    server.run();
-    headers.run();
+    server1.run();
+    server2.run();
+    headers1.run();
+    headers2.run();
   }
 
   private static HttpResponse copyTestHeaders(
@@ -78,10 +95,21 @@ class TestHeaders {
     return response;
   }
 
-  private static Config createConfig() {
+  private static Config createConfigForward() {
     return ConfigFactory.empty()
         .withValue("plugins", fromAnyRef("test-plugin/target/plugin"))
-        .withValue("forwardTo", fromAnyRef("http://localhost:9000"));
+        .withValue("forwardTo", fromAnyRef("http://localhost:9002"));
+  }
+
+  private static Config createConfigRoutes() {
+    return ConfigFactory.empty()
+        .withValue("plugins", fromAnyRef("test-plugin/target/plugin"))
+        .withValue(
+            "routes",
+            fromIterable(
+                list(
+                    map(pair("pathPrefix", "/path1"), pair("endPoint", "http://localhost:9002")),
+                    map(pair("pathPrefix", "/path2"), pair("endPoint", "http://localhost:9003")))));
   }
 
   private static HttpClient getClient() {
@@ -89,13 +117,13 @@ class TestHeaders {
   }
 
   private static java.net.http.HttpResponse<String> request(
-      final HttpHeaders headers, final String path) {
+      final HttpHeaders headers, final String path, final int port) {
     return tryToGetRethrow(
             () ->
                 client.send(
                     setHeaders(
                             java.net.http.HttpRequest.newBuilder()
-                                .uri(new URI("http://localhost:9001" + path))
+                                .uri(new URI("http://localhost:" + port + path))
                                 .method("GET", noBody()),
                             headers)
                         .build(),
@@ -103,14 +131,26 @@ class TestHeaders {
         .orElse(null);
   }
 
-  private static RequestHandler requestHandler() {
+  private static java.net.http.HttpResponse<String> requestForward(
+      final HttpHeaders headers, final String path) {
+    return request(headers, path, 9000);
+  }
+
+  private static RequestHandler requestHandler(final String server) {
     return (request, requestBody, response) ->
         simpleResponse(
             copyTestHeaders(
                 request,
-                addContentTypeHeader(addPathHeader(response, request.uri()), "text/plain")),
+                addServerHeader(
+                    addContentTypeHeader(addPathHeader(response, request.uri()), "text" + "/plain"),
+                    server)),
             OK,
             Source.of(copiedBuffer("test", UTF_8)));
+  }
+
+  private static java.net.http.HttpResponse<String> requestRoute(
+      final HttpHeaders headers, final String path) {
+    return request(headers, path, 9001);
   }
 
   private static java.net.http.HttpRequest.Builder setHeaders(
@@ -127,7 +167,7 @@ class TestHeaders {
         .forEach(
             p -> {
               final java.net.http.HttpResponse<String> response =
-                  request(of(map(pair(TEST_HEADER, list("test1"))), ALL), p);
+                  requestForward(of(map(pair(TEST_HEADER, list("test1"))), ALL), p);
 
               assertEquals("value1", response.headers().map().get("test1").get(0));
               assertEquals(p, response.headers().map().get(PATH_HEADER).get(0));
@@ -140,7 +180,7 @@ class TestHeaders {
   @DisplayName("test2")
   void test2() {
     final java.net.http.HttpResponse<String> response =
-        request(of(map(pair(TEST_HEADER, list("test2"))), ALL), "/");
+        requestForward(of(map(pair(TEST_HEADER, list("test2"))), ALL), "/");
 
     assertEquals("bad", response.headers().map().get(RESULT_HEADER).get(0));
     assertEquals(400, response.statusCode());
@@ -153,7 +193,7 @@ class TestHeaders {
         .forEach(
             p -> {
               final java.net.http.HttpResponse<String> response =
-                  request(
+                  requestForward(
                       of(map(pair(TEST_HEADER, list("test3")), pair("test3", list("value3"))), ALL),
                       p);
 
@@ -161,6 +201,23 @@ class TestHeaders {
               assertEquals("value3", response.headers().map().get(RESULT_HEADER).get(0));
               assertEquals("value", response.headers().map().get(RESULT_HEADER_2).get(0));
               assertEquals(p, response.headers().map().get(PATH_HEADER).get(0));
+              assertEquals("test", response.body());
+            });
+  }
+
+  @Test
+  @DisplayName("test4")
+  void test4() {
+    list(pair("/path1", "server1"), pair("/path2", "server2"))
+        .forEach(
+            p -> {
+              final java.net.http.HttpResponse<String> response =
+                  requestRoute(of(map(pair(TEST_HEADER, list("test1"))), ALL), p.first);
+
+              assertEquals("value1", response.headers().map().get("test1").get(0));
+              assertEquals(p.first, response.headers().map().get(PATH_HEADER).get(0));
+              assertEquals("value", response.headers().map().get(RESULT_HEADER_2).get(0));
+              assertEquals(p.second, response.headers().map().get(SERVER_HEADER).get(0));
               assertEquals("test", response.body());
             });
   }
