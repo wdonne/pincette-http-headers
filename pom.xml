@@ -6,7 +6,7 @@
 
   <groupId>net.pincette</groupId>
   <artifactId>pincette-http-headers</artifactId>
-  <version>1.1.0</version>
+  <version>1.1.1</version>
   <packaging>jar</packaging>
   <name>pincette-http-headers</name>
   <description>Allows request and response headers to be manipulated</description>
@@ -58,22 +58,22 @@
     <dependency>
       <groupId>net.pincette</groupId>
       <artifactId>pincette-common</artifactId>
-      <version>2.5.0</version>
+      <version>2.5.3</version>
     </dependency>
     <dependency>
       <groupId>net.pincette</groupId>
       <artifactId>pincette-rs</artifactId>
-      <version>3.7.0</version>
+      <version>3.9.0</version>
     </dependency>
     <dependency>
       <groupId>net.pincette</groupId>
       <artifactId>pincette-netty-http</artifactId>
-      <version>3.2.3</version>
+      <version>3.2.8</version>
     </dependency>
     <dependency>
       <groupId>net.pincette</groupId>
       <artifactId>pincette-config-util</artifactId>
-      <version>1.0.0</version>
+      <version>1.0.1</version>
     </dependency>
     <dependency>
       <groupId>com.typesafe</groupId>
@@ -89,17 +89,17 @@
     <dependency>
       <groupId>org.slf4j</groupId>
       <artifactId>slf4j-jdk14</artifactId>
-      <version>2.0.13</version>
+      <version>2.0.17</version>
     </dependency>
     <dependency>
       <groupId>org.slf4j</groupId>
       <artifactId>slf4j-api</artifactId>
-      <version>2.0.13</version>
+      <version>2.0.17</version>
     </dependency>
     <dependency>
       <groupId>org.junit.jupiter</groupId>
       <artifactId>junit-jupiter</artifactId>
-      <version>5.10.3</version>
+      <version>5.13.0</version>
       <scope>test</scope>
     </dependency>
   </dependencies>
@@ -122,7 +122,7 @@
       <plugin>
         <groupId>com.google.cloud.tools</groupId>
         <artifactId>jib-maven-plugin</artifactId>
-        <version>3.4.3</version>
+        <version>3.4.5</version>
         <configuration>
           <from>
             <image>gcr.io/distroless/java17-debian12</image>
@@ -148,6 +148,10 @@
           <container>
             <entrypoint>
               <entry>java</entry>
+              <entry>-XX:+ExitOnOutOfMemoryError</entry>
+              <entry>-XX:MaxRAMPercentage=75.0</entry>
+              <entry>-XX:MaxHeapFreeRatio=10</entry>
+              <entry>-XX:MinHeapFreeRatio=5</entry>
               <entry>--module-path</entry>
               <entry>/app/classpath:/app/libs</entry>
               <entry>--module</entry>
@@ -165,7 +169,7 @@
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-dependency-plugin</artifactId>
-        <version>3.7.0</version>
+        <version>3.8.1</version>
         <executions>
           <execution>
             <id>copy-dependencies-modules</id>
