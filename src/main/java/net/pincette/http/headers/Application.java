@@ -1,7 +1,6 @@
 package net.pincette.http.headers;
 
-import static com.typesafe.config.ConfigFactory.defaultApplication;
-import static com.typesafe.config.ConfigFactory.defaultOverrides;
+import static com.typesafe.config.ConfigFactory.load;
 import static java.lang.Integer.parseInt;
 import static java.lang.System.exit;
 import static java.util.logging.Logger.getLogger;
@@ -15,7 +14,7 @@ import java.util.logging.Logger;
  */
 public class Application {
   static final Logger LOGGER = getLogger("net.pincette.http.headers");
-  private static final String VERSION = "1.1.5";
+  private static final String VERSION = "1.1.6";
 
   @SuppressWarnings("java:S106") // Not logging. Its just a CLI.
   public static void main(final String[] args) {
@@ -26,6 +25,6 @@ public class Application {
 
     initLogging();
     LOGGER.info(() -> "Version " + VERSION);
-    new Server(parseInt(args[0]), defaultOverrides().withFallback(defaultApplication())).start();
+    new Server(parseInt(args[0]), load()).start();
   }
 }

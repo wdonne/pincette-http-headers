@@ -6,7 +6,7 @@
 
   <groupId>net.pincette</groupId>
   <artifactId>pincette-http-headers</artifactId>
-  <version>1.1.5</version>
+  <version>1.1.6</version>
   <packaging>jar</packaging>
   <name>pincette-http-headers</name>
   <description>Allows request and response headers to be manipulated</description>
@@ -63,17 +63,17 @@
     <dependency>
       <groupId>net.pincette</groupId>
       <artifactId>pincette-rs</artifactId>
-      <version>3.11.6</version>
+      <version>3.11.8</version>
     </dependency>
     <dependency>
       <groupId>net.pincette</groupId>
       <artifactId>pincette-netty-http</artifactId>
-      <version>3.2.19</version>
+      <version>3.2.21</version>
     </dependency>
     <dependency>
       <groupId>net.pincette</groupId>
       <artifactId>pincette-config-util</artifactId>
-      <version>1.0.5</version>
+      <version>1.0.6</version>
     </dependency>
     <dependency>
       <groupId>org.glassfish</groupId>
