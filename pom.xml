@@ -6,7 +6,7 @@
 
   <groupId>net.pincette</groupId>
   <artifactId>pincette-http-headers</artifactId>
-  <version>1.1.6</version>
+  <version>1.1.7</version>
   <packaging>jar</packaging>
   <name>pincette-http-headers</name>
   <description>Allows request and response headers to be manipulated</description>
@@ -68,7 +68,7 @@
     <dependency>
       <groupId>net.pincette</groupId>
       <artifactId>pincette-netty-http</artifactId>
-      <version>3.2.21</version>
+      <version>3.2.22</version>
     </dependency>
     <dependency>
       <groupId>net.pincette</groupId>
@@ -94,7 +94,7 @@
     <dependency>
       <groupId>org.junit.jupiter</groupId>
       <artifactId>junit-jupiter</artifactId>
-      <version>6.0.3</version>
+      <version>6.1.0</version>
       <scope>test</scope>
     </dependency>
   </dependencies>
@@ -164,7 +164,7 @@
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-dependency-plugin</artifactId>
-        <version>3.10.0</version>
+        <version>3.11.0</version>
         <executions>
           <execution>
             <id>copy-dependencies-modules</id>
